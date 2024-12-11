@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GCD and Distance Calculator with Dynamic Map</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        button {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+        #map {
+            margin-top: 20px;
+            width: 100%;
+            height: 600px; /* Increased height of the map */
+            border: 1px solid #ccc;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div class="container">
+        <h1>GCD and Distance Calculator with Dynamic Map</h1>
+
+        <h2>Calculate Distance Between Two Points</h2>
+        <label for="x1">Latitude 1:</label>
+        <input type="number" id="x1" placeholder="Enter latitude for point 1" oninput="updateMap()">
+
+        <label for="y1">Longitude 1:</label>
+        <input type="number" id="y1" placeholder="Enter longitude for point 1" oninput="updateMap()">
+
+        <label for="x2">Latitude 2:</label>
+        <input type="number" id="x2" placeholder="Enter latitude for point 2" oninput="updateMap()">
+
+        <label for="y2">Longitude 2:</label>
+        <input type="number" id="y2" placeholder="Enter longitude for point 2" oninput="updateMap()">
+
+        <div id="result" class="result"></div>
+
+        <h2>Map Visualization</h2>
+        <div id="map"></div>
+    </div>
+
+    <script>
+        let map = L.map('map').setView([0, 0], 2);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        let markers = [];
+        let arcLine = null;
+
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of Earth in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // Distance in km
+        }
+
+        function computeGeodesic(lat1, lon1, lat2, lon2, numPoints = 100) {
+            const arcCoords = [];
+            const toRadians = Math.PI / 180;
+            const toDegrees = 180 / Math.PI;
+
+            lat1 *= toRadians;
+            lon1 *= toRadians;
+            lat2 *= toRadians;
+            lon2 *= toRadians;
+
+            for (let i = 0; i <= numPoints; i++) {
+                const f = i / numPoints;
+                const A = Math.sin((1 - f) * Math.PI / 180);
+                const B = Math.sin(f * Math.PI / 180);
+                const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+                const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+                const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+                const lat = Math.atan2(z, Math.sqrt(x * x + y * y)) * toDegrees;
+                const lon = Math.atan2(y, x) * toDegrees;
+                arcCoords.push([lat, lon]);
+            }
+
+            return arcCoords;
+        }
+
+        function updateMap() {
+            const x1 = parseFloat(document.getElementById('x1').value);
+            const y1 = parseFloat(document.getElementById('y1').value);
+            const x2 = parseFloat(document.getElementById('x2').value);
+            const y2 = parseFloat(document.getElementById('y2').value);
+
+            if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) {
+                document.getElementById('result').innerHTML = 'Please enter valid coordinates for calculation.';
+                return;
+            }
+
+            const gcdDistance = haversine(x1, y1, x2, y2);
+
+            document.getElementById('result').innerHTML = 
+                `<strong>Great Circle Distance:</strong> ${gcdDistance.toFixed(2)} km`;
+
+            markers.forEach(marker => map.removeLayer(marker));
+            if (arcLine) {
+                map.removeLayer(arcLine);
+            }
+            markers = [];
+
+            const marker1 = L.marker([x1, y1]).addTo(map).bindPopup('Point 1').openPopup();
+            const marker2 = L.marker([x2, y2]).addTo(map).bindPopup('Point 2').openPopup();
+            markers.push(marker1, marker2);
+
+            const arcCoords = computeGeodesic(x1, y1, x2, y2);
+
+            arcLine = L.polyline(arcCoords, {color: 'red', weight: 2}).addTo(map);
+
+            map.fitBounds(arcLine.getBounds());
+        }
+    </script>
+</body>
+</html>
